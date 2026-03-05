@@ -14,6 +14,9 @@ from ryu.lib.packet import ethernet
 from ryu.lib.packet import arp
 from ryu.lib.packet import ipv4
 
+from ryu.lib.packet import tcp
+from ryu.lib.packet import icmp
+
 import time
 
 
@@ -229,14 +232,33 @@ class SDNFirewallLoadBalancer(app_manager.RyuApp):
 
                 return
 
-            self.logger.info("Firewall : traffic normal")
+            # ==========================================
+            # LOAD BALANCER & TRAFFIC STEERING
+            # ==========================================
+            tcp_pkt = pkt.get_protocol(tcp.tcp)
+            icmp_pkt = pkt.get_protocol(icmp.icmp)
 
-            server_ip = self.pilih_server()
+            if tcp_pkt and tcp_pkt.dst_port == 80:
+                # 1. LOAD BALANCER: Trafik Web Publik (Port 80) dibagi rata
+                server_ip = self.pilih_server()
+                self.logger.info("[LOAD BALANCER] Trafik Web diarahkan ke %s", server_ip)
+
+            elif tcp_pkt and tcp_pkt.dst_port == 22:
+                # 2. TRAFFIC STEERING: Trafik SSH (Port 22) HANYA ke Server 1
+                server_ip = "10.0.0.2"
+                self.logger.info("[TRAFFIC STEERING] Trafik SSH dipaksa ke %s", server_ip)
+            
+            elif icmp_pkt:
+                # 3. TRAFFIC STEERING: Trafik Ping dipaksa HANYA ke Server 2
+                server_ip = "10.0.0.3"
+                self.logger.info("[TRAFFIC STEERING] Paket ICMP dipaksa ke %s", server_ip)
+            
+            else:
+                # Default untuk trafik lainnya
+                server_ip = self.pilih_server()
+            # ==========================================
 
             server_mac = self.SERVER_POOL[server_ip]
-
-            self.logger.info("LoadBalancer mengarahkan ke server %s",
-                             server_ip)
 
             actions = [
                 parser.OFPActionSetField(eth_dst=server_mac),
