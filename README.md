@@ -117,6 +117,24 @@ Controller akan memilih server backend secara **bergantian (Round Robin)**.
 
 ---
 
+### 5. Pengujian Traffic Steering
+
+Fitur ini memaksa tipe trafik tertentu ke server spesifik berdasarkan protokol dan port:
+
+## Trafik SSH (Port 22): Dipaksa ke Server 1 (10.0.0.2).
+
+```
+h1 nc -zv 10.0.0.100 22
+```
+
+## Trafik ICMP (Ping): Dipaksa ke Server 2 (10.0.0.3)
+
+```
+h1 ping -c 4 10.0.0.100
+```
+
+---
+
 ## Simulasi Serangan DDoS
 
 Untuk mensimulasikan serangan DDoS dapat menggunakan perintah berikut:
