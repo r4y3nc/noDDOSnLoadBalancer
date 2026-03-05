@@ -260,9 +260,17 @@ class SDNFirewallLoadBalancer(app_manager.RyuApp):
 
             server_mac = self.SERVER_POOL[server_ip]
 
+            if server_ip == "10.0.0.2":
+                out_port = 2
+            elif server_ip == "10.0.0.3":
+                out_port = 3
+            else:
+                out_port = 2
+
             actions = [
                 parser.OFPActionSetField(eth_dst=server_mac),
-                parser.OFPActionOutput(2)
+                parser.OFPActionSetField(ipv4_dst=server_ip),
+                parser.OFPActionOutput(out_port)
             ]
 
             out = parser.OFPPacketOut(
@@ -273,3 +281,39 @@ class SDNFirewallLoadBalancer(app_manager.RyuApp):
                 data=msg.data)
 
             datapath.send_msg(out)
+
+            return
+
+        # ==========================================
+        # HANDLE REVERSE TRAFFIC (Server -> Client)
+        # ==========================================
+        if ip_pkt and ip_pkt.src in ["10.0.0.2", "10.0.0.3"]:
+            actions = [
+                parser.OFPActionSetField(eth_src=self.LB_MAC),
+                parser.OFPActionSetField(ipv4_src=self.VIP),
+                parser.OFPActionOutput(1)
+            ]
+
+            out = parser.OFPPacketOut(
+                datapath=datapath,
+                buffer_id=ofproto.OFP_NO_BUFFER,
+                in_port=in_port,
+                actions=actions,
+                data=msg.data)
+
+            datapath.send_msg(out)
+            return
+
+        # ==========================================
+        # NORMAL FLOODING
+        # ==========================================
+        actions = [parser.OFPActionOutput(ofproto.OFPP_FLOOD)]
+        out = parser.OFPPacketOut(
+            datapath=datapath,
+            buffer_id=ofproto.OFP_NO_BUFFER,
+            in_port=in_port,
+            actions=actions,
+            data=msg.data)
+        
+        datapath.send_msg(out)
+
